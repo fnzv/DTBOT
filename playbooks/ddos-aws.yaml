@@ -1,0 +1,17 @@
+- name: Configure instance
+  hosts: all
+  remote_user: ubuntu
+  gather_facts: False
+  become: yes
+  become_user: root
+  tasks:
+    - name: Setting ulimit
+      shell: curl https://gist.githubusercontent.com/fnzv/ced4edaaa44cf12e1c34141b51555a51/raw/4e7645b9f0609327778b8bb0752adf14370a1beb/ulimit_increase.sh | bash
+    - name: Ensure wrk is installed
+      apt: package=wrk state=present
+    - name: Starting WRK load stress with {{concurrency }} clients
+      shell:  screen -S DDOS-ON -d -m wrk -c {{concurrency }} -d {{ duration }} {{ url }}
+      async: 15
+      poll: 0
+    - name: Send Stresser INFO
+      shell: curl -s -XPOST https://api.telegram.org/{{ telegramtoken }}/SendMessage -d chat_id={{ telegramchatid }} -d text="Finished on AWS VM $(curl ip.enter.it)"

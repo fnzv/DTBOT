@@ -1,0 +1,73 @@
+- name: Adding SSH key
+  hosts: localhost
+  tasks:
+    - name: Adding Public SSH Key
+      os_keypair:
+        name: "{{ansible_hostname}}"
+        state: present
+        public_key_file: /etc/dtbot/key/key.pub
+- name: Launch an instance
+  hosts: localhost
+  tasks:
+    - name: Launch a VM
+      os_server:
+        image: GNU/Linux Ubuntu Server 16.04 Xenial Xerus x64
+        name: "STRESSER-NODE {{ item }}"
+        key_name: "{{ansible_hostname}}"
+        availability_zone: nova
+        flavor: e1standard.x2
+        state: present
+        network: default
+      #    meta:
+      #   hostname: webserver.localdomain
+      #  userdata: |
+          #cloud-config
+          #     packages:
+          #  - python
+          # package_upgrade: true
+      register: stresser
+      with_sequence: start=0 count={{ total_nodes }}
+    - name: Add VM to inventory
+      add_host:
+        name: "{{ item.server.name }}"
+        groups: openstack_vms
+        ansible_host: "{{ item.server.public_v4 }}"
+      with_items: "{{ stresser.results }}"
+        #    - name: Wait to be sure ssh is available
+        #     pa#use:
+        #     seconds: 60
+
+- hosts: openstack_vms
+  remote_user: ubuntu
+  gather_facts: False
+  become: yes
+  become_user: root
+  vars:
+    ansible_ssh_private_key_file: "/etc/dtbot/key/key"
+  tasks:
+    - name: restart server
+      shell: sleep 2 && shutdown -r now
+      async: 1
+      poll: 0
+      become: yes
+      become_method: sudo
+      ignore_errors: true
+      
+          #    - name: restart the system
+          #      shell: reboot now
+          #      async: 10
+          #      poll: 0
+          #      ignore_errors: yes
+  #    - name: wait for the system to reboot
+  #    wait_for_connection:
+  #    connect_timeout: 20
+  #    sleep: 5
+  #    delay: 5
+  #    timeout: 60
+- hosts: localhost
+  remote_user: ubuntu
+  tasks:
+    - name: Send Stresser INFO
+      shell: curl -s -XPOST https://api.telegram.org/{{ telegramtoken }}/SendMessage -d chat_id={{ telegramchatid }} -d text="Shut off all Loadstressers.."
+
+

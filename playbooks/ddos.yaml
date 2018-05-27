@@ -1,0 +1,64 @@
+- name: Adding SSH key
+  hosts: localhost
+  tasks:
+    - name: Adding Public SSH Key
+      os_keypair:
+        name: "{{ansible_hostname}}"
+        state: present
+        public_key_file: /etc/dtbot/key/key.pub
+- name: Launch an instance
+  hosts: localhost
+  tasks:
+    - name: Launch a VM
+      os_server:
+        image: GNU/Linux Ubuntu Server 16.04 Xenial Xerus x64
+        name: "STRESSER-NODE {{ item }}"
+        key_name: "{{ansible_hostname}}"
+        availability_zone: nova
+        flavor: e1standard.x2
+        state: present
+        network: default
+        meta:
+         hostname: stresser{{ item }}.localdomain
+        userdata: |
+          #cloud-config
+          packages:
+            - python
+          package_upgrade: true
+      register: stresser
+      with_sequence: start=0 count={{ total_nodes }}
+    - name: Add VM to inventory
+      add_host:
+        name: "{{ item.server.name }}"
+        groups: openstack_vms
+        ansible_host: "{{ item.server.public_v4 }}"
+      with_items: "{{ stresser.results }}"
+      #    - name: Wait to be sure ssh is available
+        #     pa#use:
+        #     seconds: 60
+
+- hosts: openstack_vms
+  remote_user: ubuntu
+  vars:
+    ansible_ssh_private_key_file: "/etc/dtbot/key/key"
+  gather_facts: False
+  become: yes
+  become_user: root
+  tasks:
+      - name: Setting ulimit
+        shell: curl https://gist.githubusercontent.com/fnzv/ced4edaaa44cf12e1c34141b51555a51/raw/4e7645b9f0609327778b8bb0752adf14370a1beb/ulimit_increase.sh | bash 
+      - name: Ensure wrk is installed
+        apt: package=wrk state=present
+      - name: Starting WRK load stress with {{concurrency }} clients
+        shell:  screen -S DDOS-ON -d -m wrk -c {{concurrency }} -t 4 -d {{ duration }} {{ url }}
+        async: 15
+        poll: 0
+      - name: Starting WRK load stress with {{concurrency }} clients
+        debug:  msg="screen -S DDOS-ON -d -m wrk -c {{concurrency }} -t 4 -d {{ duration }} {{ url }}"
+      - name: Send Stresser INFO
+        shell: curl -s -XPOST https://api.telegram.org/{{ telegramtoken }}/SendMessage -d chat_id={{ telegramchatid }} -d text="Started task on VM $(curl ifconfig.co)"
+      - name: test
+        debug:  msg="curl -s -XPOST https://api.telegram.org/{{ telegramtoken }}/SendMessage -d chat_id={{ telegramchatid }} -d text=Finished"
+
+
+

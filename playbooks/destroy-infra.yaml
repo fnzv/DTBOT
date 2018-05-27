@@ -1,0 +1,29 @@
+- name: Adding SSH key
+  hosts: localhost
+  tasks:
+    - name: Adding Public SSH Key
+      os_keypair:
+        name: "{{ansible_hostname}}"
+        state: present
+        public_key_file: /etc/dtbot/key/key.pub
+- name: Launch an instance
+  hosts: localhost
+  tasks:
+    - name: Launch a VM
+      os_server:
+        image: GNU/Linux Ubuntu Server 16.04 Xenial Xerus x64
+        name: "STRESSER-NODE {{ item }}"
+        key_name: "{{ansible_hostname}}"
+        availability_zone: nova
+        flavor: e1standard.x2
+        state: absent
+        network: default
+        meta:
+         hostname: stresser{{ item }}.localdomain
+        userdata: |
+          #cloud-config
+          packages:
+            - python
+          package_upgrade: true
+      register: stresser
+      with_sequence: start=0 count={{ total_nodes }}

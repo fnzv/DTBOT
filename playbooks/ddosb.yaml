@@ -1,0 +1,48 @@
+- name: Adding SSH key
+  hosts: localhost
+  tasks:
+    - name: Adding Public SSH Key
+      os_keypair:
+        name: "{{ansible_hostname}}"
+        state: present
+        public_key_file: /etc/dtbot/key/key.pub
+- name: Launch an instance
+  hosts: localhost
+  tasks:
+    - name: Launch a VM
+      os_server:
+        image: GNU/Linux Ubuntu Server 16.04 Xenial Xerus x64
+        name: "STRESSER-NODE {{ item }}"
+        key_name: "{{ansible_hostname}}"
+        availability_zone: nova
+        flavor: e1standard.x2
+        state: present
+        network: default
+        meta:
+         hostname: stresser{{ item }}.localdomain
+      register: stresser
+      with_sequence: start=0 count={{ total_nodes }}
+    - name: Add VM to inventory
+      add_host:
+        name: "{{ item.server.name }}"
+        groups: openstack_vms
+        ansible_host: "{{ item.server.public_v4 }}"
+      with_items: "{{ stresser.results }}"
+
+- name: Configure instance
+  hosts: openstack_vms
+  remote_user: ubuntu
+  vars:
+    ansible_ssh_private_key_file: "/etc/dtbot/key/key"
+  gather_facts: False
+  become: yes
+  become_user: root
+  tasks:
+    - name: Download custom bash
+      shell: wget {{ url }} -O /root/custom_bash.sh
+    - name: Starting custom load stress with clients
+      shell:  bash /root/custom_bash.sh
+      async: 15
+      poll: 0
+    - name: Send Stresser INFO
+      shell: curl -s -XPOST https://api.telegram.org/{{ telegramtoken }}/SendMessage -d chat_id={{ telegramchatid }} -d text="Finished custom bash on VM $(curl ifconfig.co)"

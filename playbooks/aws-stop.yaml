@@ -1,0 +1,20 @@
+- name: Configure instance
+  hosts: all
+  remote_user: ubuntu
+  gather_facts: False
+  become: yes
+  become_user: root
+  tasks:
+    - name: Reboot EC2 Instances
+      shell: sleep 2 && shutdown -r now
+      async: 1
+      poll: 0
+      become: yes
+      become_method: sudo
+      ignore_errors: true
+
+- hosts: localhost
+  remote_user: ubuntu
+  tasks:
+    - name: Send Stresser INFO
+      shell: curl -s -XPOST https://api.telegram.org/{{ telegramtoken }}/SendMessage -d chat_id={{ telegramchatid }} -d text="Shut off all AWS Loadstressers.."

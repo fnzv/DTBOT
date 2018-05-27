@@ -1,0 +1,12 @@
+[Unit]
+Description=DownTimeBot service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/dtbot_ctrl
+Restart=on-failure 
+
+[Install]
+WantedBy=multi-user.target

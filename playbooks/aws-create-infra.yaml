@@ -1,0 +1,42 @@
+- hosts: localhost
+  connection: local
+  gather_facts: False
+  tasks:
+    - name: Provision instances 
+      ec2:
+        key_name: Sami
+        instance_type: t2.large
+        image: ami-7c412f13   # Ubuntu 16
+        wait: yes
+        instance_initiated_shutdown_behavior: terminate
+        region: eu-central-1
+        count: "{{ total_nodes }}"
+        instance_tags:
+          stresser_large: true
+        user_data: |
+         #!/bin/bash
+         apt-get update
+         apt-get install -y python-simplejson
+      register: ec2
+    - name: Add all instance public IPs to host group
+      add_host: hostname={{ item.public_ip }} groups=ec2hosts
+      loop: "{{ ec2.instances }}"
+
+    - name: Wait for instance to be ready
+      pause:
+        seconds: 100
+
+- name: Configure instance
+  hosts: ec2hosts
+  remote_user: ubuntu
+  gather_facts: False
+  become: yes
+  become_user: root
+  tasks:
+    - name: Setting ulimit
+      shell: curl https://gist.githubusercontent.com/fnzv/ced4edaaa44cf12e1c34141b51555a51/raw/4e7645b9f0609327778b8bb0752adf14370a1beb/ulimit_increase.sh | bash
+    - name: Ensure wrk is installed
+      apt: package=wrk state=present
+    - name: Send Stresser INFO
+      shell: curl -s -XPOST https://api.telegram.org/{{ telegramtoken }}/SendMessage -d chat_id={{ telegramchatid }} -d text="Finished deploy of AWS VM $(curl ifconfig.co)"
+   

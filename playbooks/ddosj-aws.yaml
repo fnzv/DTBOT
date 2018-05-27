@@ -1,0 +1,15 @@
+- name: Configure instance
+  hosts: all
+  remote_user: ubuntu
+  gather_facts: False
+  become: yes
+  become_user: root
+  tasks:
+    - name: Update Jmeter JMX 
+      shell: wget {{ url }}  -O /root/conf.jmx
+    - name: Starting Jmeter load stress 
+      shell:  screen -S DDOS-ON -d -m jmeter -n -t /root/conf.jmx
+      async: 15
+      poll: 0
+    - name: Send Stresser INFO
+      shell: curl -s -XPOST https://api.telegram.org/{{ telegramtoken }}/SendMessage -d chat_id={{ telegramchatid }} -d text="Finished task on AWS VM $(curl ip.enter.it)"
