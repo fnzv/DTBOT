@@ -5,6 +5,8 @@
   become: yes
   become_user: root
   tasks:
+    - name: Ensure jmeter is installed
+      apt: package=jmeter state=present
     - name: Update Jmeter JMX 
       shell: wget {{ url }}  -O /root/conf.jmx
     - name: Starting Jmeter load stress 
